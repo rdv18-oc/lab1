@@ -8,7 +8,7 @@ check-deps:
 	@command -v $(CXX) >/dev/null 2>&1 || { echo >&2 "error: g++ not install."; exit 1; }
 
 build: 
-	$(CXX) $(CXXFLAGS) main.cpp -o $(TARGET)
+	g++ -Wall -std=c++11 main.cpp -o $(TARGET)
 
 clean: 
 	rm -f $(TARGET)

@@ -1,0 +1,68 @@
+name: CI/CD Variant 17
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  Build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+      - name: Compile C++
+        run: make build
+      - name: Archive production artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-file
+          path: text_processor
+
+  Test:
+    needs: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-file
+      - name: Run Test Logic
+        run: |
+          chmod +x text_processor
+          # Тест: Small (5) big (3) largest (7). Среднее 5. Ожидаем: Small largest.
+          echo "Small big largest." | ./text_processor > output.txt
+          if grep -q "Small largest" output.txt; then
+            echo "Test passed!"
+          else
+            echo "Test failed!"
+            exit 1
+          fi
+
+  Package:
+    needs: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download binary
+        uses: actions/download-artifact@v4
+        with:
+          name: binary-file
+      - name: Create .deb package
+        run: |
+          mkdir -p package_dir/DEBIAN
+          mkdir -p package_dir/usr/local/bin
+          cp control package_dir/DEBIAN/
+          cp text_processor package_dir/usr/local/bin/
+          dpkg-deb --build package_dir text-processor-v17.deb
+      - name: Upload .deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: debian-package
+          path: text-processor-v17.deb
