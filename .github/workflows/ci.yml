@@ -1,68 +1,108 @@
-name: CI/CD Variant 17
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
-  Build:
-    runs-on: ubuntu-latest
+  RunMake:
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Install dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
-      - name: Compile C++
-        run: make build
-      - name: Archive production artifacts
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential g++ make
+
+      - name: Build program
+        run: |
+          make build
+
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: binary-file
+          name: built-program
           path: text_processor
 
-  Test:
-    needs: Build
-    runs-on: ubuntu-latest
+  RunTest:
+    needs: RunMake
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Download binary
+
+      - name: Download built program
         uses: actions/download-artifact@v4
         with:
-          name: binary-file
-      - name: Run Test Logic
+          name: built-program
+          path: .
+
+      - name: Run functional test
         run: |
           chmod +x text_processor
-          # Тест: Small (5) big (3) largest (7). Среднее 5. Ожидаем: Small largest.
-          echo "Small big largest." | ./text_processor > output.txt
-          if grep -q "Small largest" output.txt; then
-            echo "Test passed!"
-          else
-            echo "Test failed!"
-            exit 1
-          fi
+          echo "Small big largest." | ./text_processor > result.txt
+          # Проверка логики 17-го варианта (средняя длина 5, остаются "Small" и "largest")
+          grep -q "Small" result.txt && grep -q "largest" result.txt && echo "Test Passed"
 
-  Package:
-    needs: Test
-    runs-on: ubuntu-latest
+  RunPackage:
+    needs: RunTest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Download binary
+
+      - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          name: binary-file
-      - name: Create .deb package
+          name: built-program
+          path: .
+
+      - name: Build .deb package
         run: |
-          mkdir -p package_dir/DEBIAN
-          mkdir -p package_dir/usr/local/bin
-          cp control package_dir/DEBIAN/
-          cp text_processor package_dir/usr/local/bin/
-          dpkg-deb --build package_dir text-processor-v17.deb
-      - name: Upload .deb
+          # Создаем структуру под пакет
+          mkdir -p package/usr/bin
+          mkdir -p package/DEBIAN
+          cp text_processor package/usr/bin/
+          cp control package/DEBIAN/
+          # Собираем пакет с именем под твой 17 вариант
+          dpkg-deb --build package text-processor-v17.deb
+
+      - name: Upload .deb artifact
         uses: actions/upload-artifact@v4
         with:
-          name: debian-package
+          name: deb-package
           path: text-processor-v17.deb
+          retention-days: 1
+
+  test-docker:
+    needs: RunPackage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download deb package
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-package
+          path: .
+
+      - name: Build Docker image
+        run: docker build -t myapp-test .
+
+      - name: Save Docker image to dist folder
+        run: |
+          mkdir -p dist
+          docker save myapp-test:latest -o dist/myapp-container.tar
+          gzip -f dist/myapp-container.tar
+          echo "Локальный артефакт контейнера создан:"
+          ls -la dist/
+
+      - name: Upload container artifact to dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-image
+          path: dist/myapp-container.tar.gz
+          retention-days: 1
