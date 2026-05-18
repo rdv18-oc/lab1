@@ -97,12 +97,12 @@ jobs:
         with:
           context: .
           push: true
-          tags: rdv18-oc/lab3:latest
+          tags: cmertick/lab3:latest
 
       - name: Save Docker image to dist folder
         run: |
           mkdir -p dist
-          docker save rdv18-oc/lab3:latest -o dist/myapp-container.tar
+          docker save cmertick/lab3:latest -o dist/myapp-container.tar
           gzip -f dist/myapp-container.tar
 
       - name: Upload container artifact to dist
