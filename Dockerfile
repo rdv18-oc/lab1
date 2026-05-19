@@ -11,4 +11,4 @@ COPY run_loop.sh /usr/local/bin/run_loop.sh
 
 RUN chmod +x /usr/local/bin/run_loop.sh
 
-CMD ["/usr/local/bin/run_loop.sh"] # test trigger 4
+CMD "/usr/local/bin/run_loop.sh" # test trigger 4
